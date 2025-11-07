@@ -1,3 +1,5 @@
+mod input;
+
 use ::rand::Rng;
 use macroquad::prelude::*;
 use std::collections::VecDeque;
@@ -7,20 +9,9 @@ const GRID_H: i32 = 20;
 const CELL_SIZE: f32 = 24.0;
 const MOVE_DELAY: f32 = 0.12;
 
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum Direction { Up, Down, Left, Right, }
-
-fn opposite(a: Direction, b: Direction) -> bool {
-    matches!((a, b),
-        (Direction::Up, Direction::Down) |
-        (Direction::Down, Direction::Up) |
-        (Direction::Left, Direction::Right) |
-        (Direction::Right, Direction::Left))
-}
-
 #[macroquad::main("Snake (macroquad)")]
-async fn main() {
+async fn main()
+{
     let window_w = GRID_W as f32 * CELL_SIZE;
     let window_h = GRID_H as f32 * CELL_SIZE;
 
@@ -30,13 +21,14 @@ async fn main() {
     let start_y = GRID_H / 2;
     snake.push_back((start_x, start_y));
     snake.push_back((start_x - 1, start_y));
-    let mut direction = Direction::Right;
-    let mut move_timer = 0.0f32;
+    let mut direction = input::get_start_direction();
+    let mut move_timer = 0.0;
     let mut food = spawn_food(&snake, &mut rng);
     let mut score: i32 = 0;
     let mut game_over = false;
 
-    loop {
+    loop
+    {
         clear_background(Color::from_rgba(30, 30, 30, 255));
 
         let screen_center_x = screen_width() / 2.0;
@@ -44,75 +36,72 @@ async fn main() {
         let field_x = screen_center_x - window_w / 2.0;
         let field_y = screen_center_y - window_h / 2.0;
 
-        if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-            if opposite(direction, Direction::Up) == false {
-                direction = Direction::Up;
-            }
-        }
-        else if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-            if opposite(direction, Direction::Down) == false {
-                direction = Direction::Down;
-            }
-        }
-        else if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
-            if opposite(direction, Direction::Left) == false {
-                direction = Direction::Left;
-            }
-        }
-        else if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
-            if opposite(direction, Direction::Right) == false {
-                direction = Direction::Right;
-            }
-        }
+        direction = input::get_direction(direction);
 
-        if game_over && is_key_pressed(KeyCode::R) {
+        if game_over && input::is_key_restart_down()
+        {
             snake.clear();
             snake.push_back((start_x, start_y));
             snake.push_back((start_x - 1, start_y));
-            direction = Direction::Right;
+            direction = input::get_start_direction();
             move_timer = 0.0;
             food = spawn_food(&snake, &mut rng);
             score = 0;
             game_over = false;
         }
 
-        if is_key_pressed(KeyCode::P) {
-            loop {
+        if input::is_key_pause_down()
+        {
+            loop
+            {
                 next_frame().await;
-                if is_key_pressed(KeyCode::P){
+
+                if input::is_key_pause_down()
+                {
                     break
                 }
             }
         }
 
-        if game_over == false {
+        if game_over == false
+        {
             let delta_time = get_frame_time();
+
             move_timer += delta_time;
-            if move_timer > MOVE_DELAY {
+
+            if move_timer > MOVE_DELAY
+            {
                 move_timer = 0.0;
 
                 let (head_x, head_y) = snake.front().copied().unwrap();
 
-                let new_head = match direction {
-                    Direction::Up => (head_x, head_y - 1),
-                    Direction::Down => (head_x, head_y + 1),
-                    Direction::Left => (head_x - 1, head_y),
-                    Direction::Right => (head_x + 1, head_y),
-                };
+                let new_head = input::get_head_position(direction, head_x, head_y);
 
-                if new_head.0 < 0 || new_head.0 >= GRID_W || new_head.1 < 0 || new_head.1 >= GRID_H {
+                if new_head.0 < 0 || new_head.0 >= GRID_W || new_head.1 < 0 || new_head.1 >= GRID_H
+                {
                     game_over = true;
                 }
-                else {
-                    snake.push_front(new_head);
-                }
+                else
+                {
+                    if snake.iter().any(|&seg| seg == new_head)
+                    {
+                        game_over = true;
+                    }
+                    else
+                    {
+                        snake.push_front(new_head);
+                    }
 
-                if new_head == food{
-                    score += 1;
-                    food = spawn_food(&snake, &mut rng);
-                }
-                else {
-                    snake.pop_back();
+                    if new_head == food
+                    {
+                        score += 1;
+
+                        food = spawn_food(&snake, &mut rng);
+                    }
+                    else
+                    {
+                        snake.pop_back();
+                    }
                 }
             }
         }
@@ -123,32 +112,31 @@ async fn main() {
 
         let mut i = 0;
 
-        for &(x, y) in snake.iter(){
-            let color = if i == 0{
+        for &(x, y) in snake.iter()
+        {
+            let color = if i == 0
+            {
                 Color::from_rgba(120, 220, 120, 255)
             }
-            else {
+            else
+            {
                 Color::from_rgba(40, 180, 40, 255)
             };
 
             draw_cell(field_x, field_y, x, y, color);
+
             i += 1;
         }
 
         let hud_x = 10.0;
         let hud_y = 10.0;
 
-        draw_text(
-            &format!("Score: {}", score),
-            hud_x,
-            hud_y + 20.0,
-            28.0,
-            WHITE
-        );
+        draw_text(&format!("Score: {}", score), hud_x, hud_y + 20.0, 28.0, WHITE);
 
         draw_text("Arrows / WASD - move, P - pause, R - restart (after game over)", hud_x, hud_y + 46.0, 18.0, WHITE);
 
-        if game_over {
+        if game_over
+        {
             let t = "Game Over! Press R to restart";
             let tw = measure_text(t, None, 36, 1.0);
             let x = screen_width() / 2.0 - tw.width / 2.0;
@@ -165,15 +153,19 @@ fn draw_cell(field_x: f32, field_y: f32, gx: i32, gy: i32, color: Color)
 {
     let x = field_x + gx as f32 * CELL_SIZE;
     let y = field_y + gy as f32 * CELL_SIZE;
-    
+
     draw_rectangle(x + 1.0, y + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0, color);
 }
 
-fn spawn_food(snake: &VecDeque<(i32, i32)>, rng: &mut ::rand::rngs::ThreadRng) -> (i32, i32){
-    loop {
+fn spawn_food(snake: &VecDeque<(i32, i32)>, rng: &mut ::rand::rngs::ThreadRng) -> (i32, i32)
+{
+    loop
+    {
         let fx = rng.random_range(0..GRID_W);
         let fy = rng.random_range(0..GRID_H);
-        if snake.iter().any(|&(x, y)| x == fx && y == fy) == false {
+
+        if snake.iter().any(|&(x, y)| x == fx && y == fy) == false
+        {
             return (fx, fy);
         }
     }
