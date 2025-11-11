@@ -1,4 +1,5 @@
 mod input;
+mod direction;
 
 use ::rand::Rng;
 use macroquad::prelude::*;
@@ -9,7 +10,7 @@ const GRID_H: i32 = 20;
 const CELL_SIZE: f32 = 24.0;
 const MOVE_DELAY: f32 = 0.12;
 
-#[macroquad::main("Snake (macroquad)")]
+#[macroquad::main("Snake Game")]
 async fn main()
 {
     let window_w = GRID_W as f32 * CELL_SIZE;
@@ -21,7 +22,7 @@ async fn main()
     let start_y = GRID_H / 2;
     snake.push_back((start_x, start_y));
     snake.push_back((start_x - 1, start_y));
-    let mut direction = input::get_start_direction();
+    let mut direction = direction::Direction::init_direction();
     let mut move_timer = 0.0;
     let mut food = spawn_food(&snake, &mut rng);
     let mut score: i32 = 0;
@@ -36,27 +37,27 @@ async fn main()
         let field_x = screen_center_x - window_w / 2.0;
         let field_y = screen_center_y - window_h / 2.0;
 
-        direction = input::get_direction(direction);
+        direction = direction::Direction::get_direction(direction);
 
-        if game_over && input::is_key_restart_down()
+        if game_over && input::is_key_pressed_restart()
         {
             snake.clear();
             snake.push_back((start_x, start_y));
             snake.push_back((start_x - 1, start_y));
-            direction = input::get_start_direction();
+            direction = direction::Direction::init_direction();
             move_timer = 0.0;
             food = spawn_food(&snake, &mut rng);
             score = 0;
             game_over = false;
         }
 
-        if input::is_key_pause_down()
+        if input::is_key_pressed_pause()
         {
             loop
             {
                 next_frame().await;
 
-                if input::is_key_pause_down()
+                if input::is_key_pressed_pause()
                 {
                     break
                 }
@@ -75,7 +76,7 @@ async fn main()
 
                 let (head_x, head_y) = snake.front().copied().unwrap();
 
-                let new_head = input::get_head_position(direction, head_x, head_y);
+                let new_head = direction.apply_to(head_x, head_y);
 
                 if new_head.0 < 0 || new_head.0 >= GRID_W || new_head.1 < 0 || new_head.1 >= GRID_H
                 {
